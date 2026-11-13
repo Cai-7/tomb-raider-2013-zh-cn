@@ -1,0 +1,18 @@
+# 构建产物
+bin/
+obj/
+Build/
+work/
+mod/
+
+# 上游工具（由 build.ps1 自动克隆）
+tools/TrRebootModTools/
+
+# 本地生成的补丁档案
+*.tiger
+!patches/*.patch
+
+# 编辑器
+.vs/
+.idea/
+*.user

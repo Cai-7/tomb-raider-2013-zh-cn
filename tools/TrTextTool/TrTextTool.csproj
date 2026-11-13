@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>TrTextTool</AssemblyName>
+    <RootNamespace>TrTextTool</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 上游工具，由 scripts\build.ps1 克隆到 tools\TrRebootModTools -->
+    <ProjectReference Include="..\TrRebootModTools\Shared\Shared.csproj" />
+    <ProjectReference Include="..\TrRebootModTools\ModManager\ModManager.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,16 @@
+diff --git a/Shared/Cdc/Tr2013/Tr2013LocalsBin.cs b/Shared/Cdc/Tr2013/Tr2013LocalsBin.cs
+index c4cdfc1..af093d9 100644
+--- a/Shared/Cdc/Tr2013/Tr2013LocalsBin.cs
++++ b/Shared/Cdc/Tr2013/Tr2013LocalsBin.cs
+@@ -68,7 +68,10 @@ namespace TrRebootTools.Shared.Cdc.Tr2013
+                     continue;
+ 
+                 stream.Position = stringPositionsPos + PointerSize * i;
+-                writer.Write(stream.Length);
++                if (PointerSize == 4)
++                    writer.Write((int)stream.Length);
++                else
++                    writer.Write(stream.Length);
+ 
+                 stream.Position = stream.Length;
+                 WriteString(writer, str);

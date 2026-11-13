@@ -1,0 +1,31 @@
+======================================================
+  古墓丽影 9（Tomb Raider 2013 / Steam 版）
+  简体中文补丁
+======================================================
+
+【这个补丁做什么】
+把游戏自带的官方繁体中文文本（约 3388 条：菜单、字幕、物品说明、教程提示）
+转成简体中文，并替换台湾用语（蘿拉→劳拉、滑鼠→鼠标、檔案→文件 等）。
+不改动任何图像、音频和字幕时间轴。
+
+【怎么用】
+需要先装好 .NET SDK 10、Python 3 和 Git，然后在仓库根目录执行：
+
+    powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+
+脚本会自动找到 Steam 里的游戏、提取官方繁体文本、繁转简、安装。
+如果游戏不在默认位置：
+
+    powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -GamePath "D:\Games\Tomb Raider"
+
+装好后直接启动游戏即可，不需要改 Steam 语言设置。
+
+【卸载】
+    dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll uninstall "你的游戏目录"
+
+或者更简单：Steam 右键游戏 -> 属性 -> 已安装文件 -> 验证游戏文件完整性。
+
+【注意】
+  * 语音仍是英文，官方没有中文配音，只有文本汉化。
+  * Steam 验证文件完整性或重装游戏后，补丁会被还原，重新运行一次即可。
+  * 本补丁不包含任何游戏资源文件，全部内容在你本机由官方文本生成。
