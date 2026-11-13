@@ -1,162 +1,153 @@
-# 古墓丽影9（Tomb Raider 2013）简体中文补丁
+# 古墓丽影9（Tomb Raider 2013）简体中文
 
-> ## ⚠️ 重要：纯文本方案无法完整工作（2026-11 实测结论）
->
-> 把官方繁体文本繁转简后，游戏**主菜单、HUD、字幕会出现大量「□」方框**。
->
-> 原因是游戏的 UI 字体是一个**只含繁体字形的位图字库**（`fontchinese.drm` 里的
-> Scaleform `pixelFont` 图集）。简体字如「戏/结/联/别/录/继/续/画」在字库里不存在，
-> 一律渲染成方框。
->
-> 实测数据：简体文本共 40494 个汉字，其中 **12616 个（31.2%）** 是官方繁体文本里
-> 从未出现过的字；**3388 条字符串里有 2846 条（84%）**至少包含一个这样的字。
->
-> 因此**只改文本的汉化补丁在这款游戏上不可能成功**，必须同时重建字体资源
-> （把简体字形画进字库图集，或换成含简体的字库）。
->
-> 如果你只想要「能用的简体中文」，建议使用已经重建字体的社区项目
-> [intergra/TR2013-Simplified-Chinese](https://github.com/intergra/TR2013-Simplified-Chinese)。
-> 本仓库目前保留了提取/转换/安装的**工具链**和**踩坑记录**，可作为二次开发的基础，
-> 但**不要**把它当作可以直接用的成品汉化。
+《古墓丽影9》（2013，Steam 版）简体中文的**安装工具链**与**技术记录**。
 
-## 项目内容
+![社区汉化主菜单](docs/screenshots/community-mod-menu.png)
 
-工具链：从游戏里提取官方繁体文本 → 繁转简 + 台湾用语本地化 → 写回 mod 并合并进
-`patch2.000.tiger`。
+> 实测截图：安装社区汉化包后的主菜单 —— 开始游戏 / 选项 / 生存版 / 技术支持 / 退出游戏，
+> **完整简体中文，零方框**。
+
+---
+
+## 先说结论：想要能用的简体中文，用社区汉化包
+
+游戏本体自带**繁体中文**文本，但它的中文字库是一个**只含繁体字形**的位图字库。
+把文本繁转简后，游戏内 UI 会大面积变成「□」方框（实测 31.2% 的汉字缺字形）。
+
+因此**纯文本汉化在这款游戏上不可能成功**，必须同时替换字体资源。
+
+目前唯一成熟可用的方案是社区项目，它用 Noto Sans SC 重建了字库并做了完整翻译：
+
+| 项目 | 地址 |
+|---|---|
+| 完整汉化（含重建字体） | [intergra/TR2013-Simplified-Chinese](https://github.com/intergra/TR2013-Simplified-Chinese) |
+| Nexus 页面 | [mod #207](https://www.nexusmods.com/tombraider2013/mods/207) |
+| 官方工具 | [TR2013 Modding Tools / mod #112](https://www.nexusmods.com/tombraider2013/mods/112) |
+
+### 一键安装（推荐）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install-community-mod.ps1
+```
+
+脚本会：自动定位 Steam 里的游戏 → 下载汉化包（v8.0，约 1.1 GB）→ 解压 →
+构建 Mod Manager → 安装并合并进 `patch2.000.tiger`。
+
+游戏不在默认位置时：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install-community-mod.ps1 -GamePath "D:\Games\Tomb Raider"
+```
+
+装好后启动游戏，界面与字幕即为简体中文。
+**游戏语言需设为 Chinese / 中文**（游戏内「语言」设置，或 Steam 属性 → 语言）。
+
+> 官方要求用 Nexus 上的 **Mod Manager 1.10.0** 安装。本仓库的脚本改用上游源码构建的
+> ModManager 命令行方式完成打包（GUI 版本需要交互，本仓库未附带）。
+> 实测安装后主菜单为完整简体中文、无方框。社区提醒 1.11.0 可能导致 CG 卡死、
+> 文献无声等问题，若遇到请改用 Nexus 的 1.10.0 GUI 工具安装。
+
+### 卸载
+
+```powershell
+dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll uninstall "你的游戏目录"
+```
+
+或 Steam → 右键游戏 → 属性 → 已安装文件 → 验证游戏文件完整性。
+
+---
+
+## 本仓库提供什么
+
+| 目录 | 内容 |
+|---|---|
+| `scripts/install-community-mod.ps1` | 一键安装社区汉化包（下载 / 解压 / 构建 / 安装） |
+| `scripts/build.ps1` | 文本工具链：提取官方繁体 → 繁转简 → 打包成 mod |
+| `scripts/build_patch.py` | 繁转简 + 台湾用语本地化，含自检 |
+| `tools/TrTextTool/` | `.tiger` / `locals.bin` 提取、安装、校验的命令行工具 |
+| `patches/` | 上游 TrRebootModTools 的 `locals.bin` 写入 bug 修复 |
+| `docs/技术笔记.md` | 格式解剖、踩坑记录、字体问题的完整调查 |
+
+**本仓库不包含任何游戏资源文件**，也不转载第三方汉化包内容；
+汉化包由脚本在安装时从作者官方 Release 下载。
+
+---
+
+## 为什么纯文本方案会失败
 
 ![缺失字形实证](docs/screenshots/font-missing.png)
 
-> 实证截图：把菜单项换成「戏戲结結联聯 / 别別录錄继繼 / 续續画畫开開」后，繁体形正常、
-> 简体形全部变成 □。详见 [docs/技术笔记.md](docs/技术笔记.md) 第 9 节。
+> 实证：把菜单项替换成「戏戲结結联聯 / 别別录錄继繼 / 续續画畫开開」后，
+> 繁体形（戲 結 聯 別 錄 繼 續 畫 開）正常渲染，简体形（戏 结 联 别 录 继 续 画 开）
+> **全部是 □**。
 
-## 这个补丁做了什么
+游戏的 UI 字体是 `pc-w\fontchinese.drm` 里一个 4.4 MB 的 Scaleform `pixelFont`
+位图图集（内含名为 `fonts_zh_all` 的字符集与约 206 KB 度量表），
+**只包含繁体字形**。量化结果：
 
-游戏本体自带 14 种语言文本，其中繁体中文（`zhhant`）约 **3388 条**，覆盖菜单、字幕、
-物品与武器说明、教程提示等全部文本。本补丁：
+- 简体文本 40494 个汉字中，**12616 个（31.2%）**在官方繁体文本里从未出现；
+- 3388 条字符串中 **2846 条（84%）**至少包含一个这样的字。
 
-1. **繁转简全量转换**（OpenCC `t2s`），转换后无繁体残留；
-2. **台湾用语 → 大陆用语**，60 余条规则，例如：
+即便把中文写进 `en` 槽位也一样：用的是同一套位图字库，方框照样出现。
 
-   | 官方繁体 | 补丁简体 |
-   |---|---|
-   | 蘿拉 | 劳拉 |
-   | 滑鼠 / 螢幕 | 鼠标 / 屏幕 |
-   | 檔案 / 資料夾 | 文件 / 文件夹 |
-   | 預設 / 載入 / 儲存 | 默认 / 加载 / 保存 |
-   | 驅動程式 / 應用程式 | 驱动程序 / 应用程序 |
-   | 解析度 / 畫質 | 分辨率 / 画质 |
-   | 進行遊戲 | 运行游戏 |
+### 一个容易误判的坑
 
-3. **保留全部按钮图标**：原文里 `<font>` 标签内嵌的 179 个手柄/键位图标字符原样保留；
-4. 不改动任何图像、音频、字幕时间轴。
+启动前的标题界面（开始游戏 / 选项 / 技术支持 / 结束游戏）和启动前的设置窗口
+显示简体**完全正常** —— 它们走 GDI / DirectWrite 系统字体，不读游戏字库。
+**验收必须进入主菜单 / 存档界面 / 游戏内 HUD / 字幕**，
+否则会误判为「补丁成功」。
 
-## 为什么不用机翻
+### 顺便一提
 
-官方繁体文本本身通顺、术语统一、标点符合中文习惯，繁转简的效果远好于
-「英文机翻成中文」。这也是社区通行做法。
+本仓库最初的方向是「把官方繁体繁转简」，也确实是这么做的，并且**文本转换本身
+完全正确**（3388 条、繁体残留 0、按钮图标 179 个全部保留）。只是被字体卡住了。
+若哪天有人重建出覆盖简体的字库，这套文本流水线可以直接复用。
 
-## 环境要求
+---
 
-| 依赖 | 说明 |
-|---|---|
-| Windows 10/11 | 补丁目标平台 |
-| Steam 版《古墓丽影9》 | 支持 GOTY / Survival Edition（Definitive Edition 不支持） |
-| [.NET SDK 10](https://dotnet.microsoft.com/download) | 构建文本工具（上游代码用了 C# 14） |
-| [Python 3.8+](https://www.python.org/downloads/) | 运行繁转简脚本 |
-| [Git](https://git-scm.com/downloads) | 自动拉取上游解包工具 |
-
-## 快速开始（一条命令）
+## 工具链用法
 
 ```powershell
-# 在仓库根目录执行；如果游戏不在默认路径，加 -GamePath "你的路径"
-powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+# 提取各语言文本为 JSON
+dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll dump "<游戏目录>" work
+
+# 繁转简（需要 pip install opencc-python-reimplemented）
+python scripts\build_patch.py --input "work\zhhant\pc-w\local\locals.json" \
+                               --output "mod\pc-w\local\locals.bin\zhhant.json"
+
+# 安装 mod 并合并进 patch2.000.tiger
+dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll install "<游戏目录>" mod
+
+# 校验某个 .tiger 里的文本（注意：必须直接打开文件，不能用 ArchiveSet）
+dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll inspect "<游戏目录>\patch2.000.tiger"
 ```
 
-脚本会依次完成：
-
-1. 检查环境（dotnet / python / git）；
-2. 安装 Python 依赖 `opencc-python-reimplemented`；
-3. 克隆上游 [TrRebootModTools](https://github.com/arcusmaximus/TrRebootModTools) 并打上本仓库的修复补丁；
-4. 构建文本工具 `TrTextTool`；
-5. 从**你自己的游戏目录**提取官方繁体文本；
-6. 繁转简并写入 mod 目录；
-7. 安装 mod 并合并进 `patch2.000.tiger`（自动备份官方原件）。
-
-完成后直接启动游戏即可。
-
-## 手动步骤
-
-```powershell
-# 1. 准备上游工具
-git clone https://github.com/arcusmaximus/TrRebootModTools.git tools\TrRebootModTools
-cd tools\TrRebootModTools
-git apply ..\..\patches\0001-tr2013-localsbin-pointer-size.patch
-cd ..\..
-
-# 2. 构建文本工具
-dotnet build tools\TrTextTool\TrTextTool.csproj -c Release
-
-# 3. 提取官方繁体文本
-dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll "<游戏目录>" dump "work" zhhant
-
-# 4. 繁转简
-python scripts\build_patch.py --input "work\zhhant\pc-w\local\locals.json" --output "mod\pc-w\local\locals.bin\zhhant.json"
-
-# 5. 安装
-dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll "<游戏目录>" install "mod"
-```
-
-## 卸载
-
-三种方式任选：
-
-```powershell
-# 方式一：用打补丁时自动生成的官方原件还原
-cd "E:\SteamLibrary\steamapps\common\Tomb Raider"
-copy /y bigfile._orig.patch2.000.tiger patch2.000.tiger
-del bigfile._mod.zh-Hans-mod.*
-
-# 方式二：Steam -> 右键游戏 -> 属性 -> 已安装文件 -> 验证游戏文件完整性
-```
-
-## 工作原理
-
-```
-.tiger 档案
- └─ pc-w\local\locals.bin           ← 二进制文本表：语言 id + 指针数组 + UTF-8 字符串
-      ├─ en        (3362 条)
-      ├─ zhhant    (3388 条)        ← 本补丁改这一个槽位
-      └─ ...
-```
-
-1. 用 TrRebootModTools 的 `Shared` 库解析 `.tiger`，取出 `zhhant` 的 `locals.bin`；
-2. 转成 JSON，逐条繁转简 + 用语替换；
-3. 以 mod 形式写回 `pc-w\local\locals.bin\zhhant.json`（注意：`locals.bin` 在 mod 里是**目录名**，
-   文件名是语言代码）；
-4. TR2013 没有 `.nfo` 版本机制，mod 必须「扁平化」合并进 `patch2.000.tiger`，
-   由 `ModInstaller` 完成，原文件自动备份为 `bigfile._orig.patch2.000.tiger`。
-
-### 为什么要改繁体槽位而不是英文槽位
-
-游戏按语言加载不同字库（`pc-w\fontchinese.drm`、`fontuniversal.drm` 等）。只有中文语言模式
-才会加载含汉字字形的字体，所以补丁必须写 `zhhant` 槽位；写进 `en` 槽位会出现方块或缺字。
+---
 
 ## 已知问题
 
-- **语音仍是英文**：官方没有中文配音，只有文本被汉化。
-- **Steam 验证文件完整性 / 重装游戏后补丁会失效**：`patch2.000.tiger` 被还原成官方版，重新运行一次安装即可。
-- **上游工具的 bug 已在本仓库修复**：`Tr2013LocalsBin.Write` 写指针时用 8 字节覆盖 4 字节槽位，
-  导致第一条字符串被清零（表现为菜单第一项变成空白）。修复见 `patches/0001-*.patch`，详见
-  [docs/技术笔记.md](docs/技术笔记.md)。
+- **语音仍是英文**，官方没有中文配音，只有文本与字幕被汉化。
+- **Steam 验证文件完整性或重装游戏后补丁会失效**，`patch2.000.tiger` 被还原，
+  重新运行安装脚本即可。
+- 社区提醒 Mod Manager 1.11.0 可能引发 CG 卡死 / 文献无声 / 返回主菜单异常。
+  本仓库脚本用的是 1.11.0 源码构建版；主菜单已实测正常，游戏内表现请自行确认。
+
+---
 
 ## 免责声明
 
-- 本项目**不包含**任何游戏资源文件（`.tiger` / 文本 / 图像），补丁在本地由你自己游戏里的
-  官方文本生成。请自行购买正版游戏。
-- 仅供个人学习与自用，请勿用于商业用途或二次分发游戏数据。
+- 本项目**不包含**任何游戏资源文件（`.tiger` / 文本 / 图像），汉化包在安装时
+  从作者官方 Release 实时下载。请自行购买正版游戏。
+- 《Tomb Raider》(2013) 的名称、原始文本、商标、角色、图像、音频、视频、
+  资源格式及游戏资产归各自权利人所有。
+- 第三方汉化包版权归其作者所有，本仓库仅提供安装脚本与技术记录，
+  不修改、不再分发其内容；使用时请遵循该项目的许可条款。
+- 仅供个人学习与自用，请勿用于商业用途。
 
 ## 致谢
 
+- [intergra/TR2013-Simplified-Chinese](https://github.com/intergra/TR2013-Simplified-Chinese) ——
+  完整简体中文翻译与 Noto Sans SC 字体重建（本项目推荐使用的汉化包）
 - [arcusmaximus/TrRebootModTools](https://github.com/arcusmaximus/TrRebootModTools)（MIT）——
   `.tiger` 与 `locals.bin` 的解析、mod 打包与安装
 - [OpenCC](https://github.com/BYVoid/OpenCC) —— 繁简转换
@@ -164,4 +155,5 @@ del bigfile._mod.zh-Hans-mod.*
 
 ## 许可
 
-本仓库内自有代码采用 MIT 许可证，见 [LICENSE](LICENSE)。
+本仓库自有代码采用 MIT 许可证，见 [LICENSE](LICENSE)。
+第三方汉化包与字体（Noto Sans SC / KR，SIL OFL 1.1）遵循各自许可。
