@@ -74,8 +74,17 @@ def main() -> int:
     parser.add_argument("--output", required=True, help="输出的 mod JSON 路径")
     args = parser.parse_args()
 
-    with open(args.input, encoding="utf-8") as f:
-        data = json.load(f)
+    if not os.path.isfile(args.input):
+        sys.exit(f"错误：找不到输入文件 {args.input}")
+
+    try:
+        with open(args.input, encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as ex:
+        sys.exit(f"错误：输入不是合法的 JSON（{args.input}）：{ex}")
+
+    if not isinstance(data, dict):
+        sys.exit(f"错误：输入 JSON 顶层应为对象，实际是 {type(data).__name__}")
 
     out = {k: convert(v) for k, v in data.items()}
 

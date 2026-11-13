@@ -82,7 +82,15 @@ if (-not $GamePath) {
     $GamePath = Find-SteamGame
     if (-not $GamePath) { Fail "没有找到游戏目录，请用 -GamePath 指定（包含 TombRaider.exe 的文件夹）" }
 }
+if (-not (Test-Path $GamePath)) { Fail "游戏目录不存在：$GamePath" }
 $GamePath = (Resolve-Path $GamePath).Path
+
+# 安装需要约 7 GB 空间：mod 档案 1.8 GB + 扁平化后的 patch2 1.8 GB + 解压后的汉化包 2 GB + 下载的 zip 1.1 GB
+$driveName = (Split-Path -Qualifier $GamePath).TrimEnd(':')
+$freeSpace = (Get-PSDrive -Name $driveName -ErrorAction SilentlyContinue).Free
+if ($freeSpace -and $freeSpace -lt 8GB) {
+    Fail ("磁盘空间不足：{0}: 需要约 8 GB 可用空间，当前只有 {1:N1} GB" -f $driveName, ($freeSpace / 1GB))
+}
 if (-not (Test-Path (Join-Path $GamePath "TombRaider.exe"))) {
     Fail "$GamePath 下没有 TombRaider.exe，确认路径是否正确"
 }

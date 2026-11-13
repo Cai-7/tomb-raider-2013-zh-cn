@@ -128,6 +128,11 @@ static void Dump(string gameFolder, string outputFolder, string? onlyLocale)
 
 static void Install(string gameFolder, string modFolder)
 {
+    // TR2013 的 mod 全部扁平化进 patch2.000.tiger，而扁平化是以「当前的 patch2」为底稿的。
+    // 如果之前装过别的 mod，底稿里会残留旧内容，重装/换版本就会叠加。
+    // 先把 patch2 还原成官方原件，保证每次安装的起点一致。
+    RestoreOfficialPatch2(gameFolder, quiet: true);
+
     using ArchiveSet archives = ArchiveSet.Open(gameFolder, true, false, CdcGame.Tr2013);
     var cache = new ResourceUsageCache();
     cache.AddArchiveSet(archives, null, CancellationToken.None);
@@ -143,34 +148,68 @@ static void Install(string gameFolder, string modFolder)
     Console.WriteLine("已合并进 patch2.000.tiger（官方原件备份为 bigfile._orig.patch2.000.tiger）");
 }
 
+/// <summary>用官方原件 bigfile._orig.patch2.000.tiger 还原 patch2.000.tiger。</summary>
+static bool RestoreOfficialPatch2(string gameFolder, bool quiet)
+{
+    string backup = Path.Combine(gameFolder, "bigfile._orig.patch2.000.tiger");
+    string patch2 = Path.Combine(gameFolder, "patch2.000.tiger");
+    if (!File.Exists(backup))
+    {
+        if (!quiet)
+            Console.WriteLine("警告：找不到 bigfile._orig.patch2.000.tiger，无法自动还原 patch2；"
+                            + "请用 Steam 验证游戏文件完整性。");
+        return false;
+    }
+
+    File.Copy(backup, patch2, true);
+    if (!quiet)
+        Console.WriteLine("已用官方原件还原 patch2.000.tiger");
+    return true;
+}
+
 static void Uninstall(string gameFolder)
 {
-    using ArchiveSet archives = ArchiveSet.Open(gameFolder, true, true, CdcGame.Tr2013);
-    var cache = new ResourceUsageCache();
-    cache.AddArchiveSet(archives, null, CancellationToken.None);
-
-    List<Archive> mods = archives.Archives.Where(a => a.ModName != null).ToList();
-    if (mods.Count == 0)
+    // 一个 mod 可能有多个档案（不同 subId / 语言），但它们共用同一个 archive id。
+    // 按 id 逐个调用 Delete 会导致第二次删除时找不到 (id, 0) 而抛异常，
+    // 因此这里先收集去重后的 id，一次性删除。
+    using (ArchiveSet archives = ArchiveSet.Open(gameFolder, true, true, CdcGame.Tr2013))
     {
-        Console.WriteLine("没有检测到已安装的 mod");
-        return;
-    }
+        var cache = new ResourceUsageCache();
+        cache.AddArchiveSet(archives, null, CancellationToken.None);
 
-    foreach (Archive mod in mods)
-    {
-        Console.WriteLine($"移除 mod：{mod.ModName}");
-        archives.Delete(mod.Id, cache, new ConsoleProgress(), CancellationToken.None);
+        List<int> modIds = archives.Archives
+                                   .Where(a => a.ModName != null)
+                                   .Select(a => a.Id)
+                                   .Distinct()
+                                   .ToList();
+
+        if (modIds.Count == 0)
+        {
+            Console.WriteLine("没有检测到已安装的 mod");
+        }
+        else
+        {
+            foreach (int id in modIds)
+                Console.WriteLine($"移除 mod 档案 id={id}");
+            archives.Delete(modIds, cache, new ConsoleProgress(), CancellationToken.None);
+        }
     }
+    // 退出上面的 using，确保所有档案句柄已释放，再动 patch2 文件
 
     foreach (string file in Directory.EnumerateFiles(gameFolder, "bigfile._mod.*"))
-        File.Delete(file);
-
-    string backup = Path.Combine(gameFolder, "bigfile._orig.patch2.000.tiger");
-    if (File.Exists(backup))
     {
-        File.Copy(backup, Path.Combine(gameFolder, "patch2.000.tiger"), true);
-        Console.WriteLine("已用官方原件还原 patch2.000.tiger");
+        try
+        {
+            File.Delete(file);
+        }
+        catch (IOException ex)
+        {
+            Console.WriteLine($"警告：无法删除 {Path.GetFileName(file)}：{ex.Message}");
+        }
     }
+
+    if (!RestoreOfficialPatch2(gameFolder, quiet: false))
+        Console.WriteLine("请用 Steam 验证游戏文件完整性来还原。");
 }
 
 static void Inspect(string archivePath)

@@ -84,7 +84,15 @@ if (-not $GamePath) {
     $GamePath = Find-SteamGame
     if (-not $GamePath) { Fail "没有找到游戏目录，请用 -GamePath 指定" }
 }
+if (-not (Test-Path $GamePath)) { Fail "游戏目录不存在：$GamePath" }
 $GamePath = (Resolve-Path $GamePath).Path
+
+# 安装需要约 7 GB 空间：mod 档案 1.8 GB + 扁平化后的 patch2 1.8 GB + 解压后的汉化包 2 GB + 下载的 zip 1.1 GB
+$driveName = (Split-Path -Qualifier $GamePath).TrimEnd(':')
+$freeSpace = (Get-PSDrive -Name $driveName -ErrorAction SilentlyContinue).Free
+if ($freeSpace -and $freeSpace -lt 8GB) {
+    Fail ("磁盘空间不足：{0}: 需要约 8 GB 可用空间，当前只有 {1:N1} GB" -f $driveName, ($freeSpace / 1GB))
+}
 if (-not (Test-Path (Join-Path $GamePath "TombRaider.exe"))) {
     Fail "$GamePath 下没有 TombRaider.exe"
 }
@@ -104,6 +112,7 @@ if (-not (Test-Path $zipPath) -or (Get-Item $zipPath).Length -lt 100MB) {
     try {
         $wc.DownloadFile($ModUrl, $zipPath)
     } catch {
+        if (Test-Path $zipPath) { Remove-Item $zipPath -Force -ErrorAction SilentlyContinue }
         Fail "下载失败：$($_.Exception.Message)`n可以手动下载后放到 $zipPath 再重试"
     }
 }
@@ -114,7 +123,12 @@ Write-Step "解压"
 if (Test-Path $ModDir) { Remove-Item $ModDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $ModDir | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $ModDir)
+try {
+    [IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $ModDir)
+}
+catch {
+    Fail "解压失败（文件可能下载不完整）：$($_.Exception.Message)`n请删除 $zipPath 后重试"
+}
 Write-Host "解压到 $ModDir"
 
 # ---------- 5. 构建 ModManager ----------
@@ -144,9 +158,14 @@ if ($LASTEXITCODE -ne 0) { Fail "安装失败" }
 
 Write-Step "完成"
 Write-Host "安装成功。启动游戏，界面与字幕即为简体中文。" -ForegroundColor Green
+
+# 解压出来的目录约 2 GB，装完就没用了；zip 保留以便下次复用
+Remove-Item $ModDir -Recurse -Force -ErrorAction SilentlyContinue
+
 Write-Host ""
 Write-Host "注意："
 Write-Host "  · 游戏语言请设为 Chinese / 中文（游戏内 语言设置，或 Steam 属性 -> 语言）"
 Write-Host "  · 语音仍是英文，官方无中文配音"
 Write-Host "  · 卸载：dotnet `"$ToolDll`" uninstall `"$GamePath`"" -ForegroundColor DarkGray
 Write-Host "  · Steam 验证文件完整性或重装游戏后，补丁会失效，重新运行本脚本即可" -ForegroundColor DarkGray
+Write-Host "  · 已删除解压目录以省空间；下载的 zip 保留在 $zipPath" -ForegroundColor DarkGray
