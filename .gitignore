@@ -16,3 +16,6 @@ tools/TrRebootModTools/
 .vs/
 .idea/
 *.user
+
+# 发布产物（放 GitHub Releases，不进仓库）
+release/

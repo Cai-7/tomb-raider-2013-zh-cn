@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>TR2013CnInstaller</AssemblyName>
+    <RootNamespace>Tr2013CnInstaller</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <AssemblyTitle>古墓丽影9（2013）简体中文一键安装器</AssemblyTitle>
+    <Product>TR2013 CN Installer</Product>
+    <Version>1.0.0</Version>
+    <!-- Tr2013ArchiveSet 的静态构造依赖 CultureInfo.GetCultureInfo，不能开不变全球化 -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 上游工具，由 scripts\*.ps1 或手动 git clone 到 tools\TrRebootModTools -->
+    <ProjectReference Include="..\..\tools\TrRebootModTools\Shared\Shared.csproj" />
+    <ProjectReference Include="..\..\tools\TrRebootModTools\ModManager\ModManager.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 哈希对照表：CdcHash.Lookup 靠它把档案哈希反查成文件路径。缺了它，资源用法
+         缓存为空，安装会静默丢失字库等资源（实测踩过）。必须和 exe 放在一起。 -->
+    <None Include="..\..\tools\TrRebootModTools\Extractor\TR2013_PC_Release.list"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

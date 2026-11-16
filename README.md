@@ -9,7 +9,21 @@
 
 ---
 
-## 先说结论：想要能用的简体中文，用社区汉化包
+## 快速开始：一键安装器
+
+下载 [Releases](https://github.com/Cai-7/tomb-raider-2013-zh-cn/releases) 里的
+`TR2013CnInstaller-v1.0.0.zip`，解压后运行 `TR2013CnInstaller.exe`：
+
+![安装器界面](docs/screenshots/installer_gui.png)
+
+点 **一键安装**，等它跑完，启动游戏并在「语言」设置里选 **Chinese / 中文** 即可。
+详细图文步骤见 [docs/安装指南.md](docs/安装指南.md)。
+
+不想用图形界面？`scripts\install-community-mod.ps1` 是同一套逻辑的命令行版本。
+
+---
+
+## 背景：为什么需要"重建字库"的汉化包
 
 游戏本体自带**繁体中文**文本，但它的中文字库是一个**只含繁体字形**的位图字库。
 把文本繁转简后，游戏内 UI 会大面积变成「□」方框（实测 31.2% 的汉字缺字形）。
@@ -61,7 +75,9 @@ dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll uninstall "你的游�
 
 | 目录 | 内容 |
 |---|---|
-| `scripts/install-community-mod.ps1` | 一键安装社区汉化包（下载 / 解压 / 构建 / 安装） |
+| `installer/Tr2013CnInstaller/` | 一键安装器应用（WinForms 图形界面 + 命令行双模式，自包含发布） |
+| `docs/安装指南.md` | 面向普通玩家的图文安装指南 |
+| `scripts/install-community-mod.ps1` | 同一逻辑的命令行版本（下载 / 解压 / 构建 / 安装） |
 | `scripts/build.ps1` | 文本工具链：提取官方繁体 → 繁转简 → 打包成 mod |
 | `scripts/build_patch.py` | 繁转简 + 台湾用语本地化，含自检 |
 | `tools/TrTextTool/` | `.tiger` / `locals.bin` 提取、安装、校验的命令行工具 |
@@ -147,7 +163,9 @@ dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll inspect "<游戏目录
 ## 致谢
 
 - [intergra/TR2013-Simplified-Chinese](https://github.com/intergra/TR2013-Simplified-Chinese) ——
-  完整简体中文翻译与 Noto Sans SC 字体重建（本项目推荐使用的汉化包）
+  完整简体中文翻译与 Noto Sans SC 字体重建（作者 **NoWindNoMoon / 此情无关风月**，
+  本项目推荐并唯一使用的汉化包；安装器不内置、不转载其内容，运行时从其官方
+  Release 实时下载）
 - [arcusmaximus/TrRebootModTools](https://github.com/arcusmaximus/TrRebootModTools)（MIT）——
   `.tiger` 与 `locals.bin` 的解析、mod 打包与安装
 - [OpenCC](https://github.com/BYVoid/OpenCC) —— 繁简转换
