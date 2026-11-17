@@ -80,7 +80,7 @@ dotnet tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll uninstall "你的游�
 | `scripts/install-community-mod.ps1` | 同一逻辑的命令行版本（下载 / 解压 / 构建 / 安装） |
 | `scripts/build.ps1` | 文本工具链：提取官方繁体 → 繁转简 → 打包成 mod |
 | `scripts/build_patch.py` | 繁转简 + 台湾用语本地化，含自检 |
-| `tools/TrTextTool/` | `.tiger` / `locals.bin` 提取、安装、校验的命令行工具 |
+| `tools/TrTextTool/` | `.tiger` / `locals.bin` 的提取与校验工具（基于上游 1.11.0，**仅用于文本提取/检查**；安装汉化请用安装器，不要用它的 install 命令） |
 | `patches/` | 上游 TrRebootModTools 的 `locals.bin` 写入 bug 修复 |
 | `docs/技术笔记.md` | 格式解剖、踩坑记录、字体问题的完整调查 |
 
