@@ -12,7 +12,7 @@
 ## 快速开始：一键安装器
 
 下载 [Releases](https://github.com/Cai-7/tomb-raider-2013-zh-cn/releases) 里的
-`TR2013CnInstaller-v1.0.0.zip`，解压后运行 `TR2013CnInstaller.exe`：
+`TR2013CnInstaller-v1.0.1.zip`，解压后运行 `TR2013CnInstaller.exe`：
 
 ![安装器界面](docs/screenshots/installer_gui.png)
 

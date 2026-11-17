@@ -1,58 +1,53 @@
 ﻿<#
 .SYNOPSIS
-    《古墓丽影9》(2013) 简体中文 —— 一键安装社区完整汉化包
+    《古墓丽影9》(2013) 简体中文 —— 从源码构建并运行一键安装器
 
 .DESCRIPTION
-    下载 intergra/TR2013-Simplified-Chinese 的正式发布包，解压后用 Mod Manager
-    的打包逻辑合并进 patch2.000.tiger。
+    构建 installer\Tr2013CnInstaller 并调用其命令行模式安装汉化。
 
-    该汉化包重建了中文字库（Noto Sans SC），因此菜单、HUD、字幕不会出现方框。
-
-    注意：Mod Manager 的 GUI 版本请使用 Nexus 上的 1.10.0。本脚本改用上游源码
-    构建的 ModManager（1.11.0）命令行方式完成打包，实测安装后主菜单为完整
-    简体中文、无方框。
+    重要：安装器固定在 Mod Manager 1.10.0（上游提交 5309f18），这是汉化作者
+    实测验证的版本。上游 1.11.0 会改变资源集合（.drm）的重写结果，实测在
+    滑索等场景会卡死，因此这里固定回 1.10.0 并打上 locals.bin 写入修复。
 
 .PARAMETER GamePath
     游戏根目录（含 TombRaider.exe）。不传则自动在 Steam 库中查找。
 
-.PARAMETER Version
-    汉化包版本标签，默认 v8.0。
+.PARAMETER Zip
+    使用本地汉化包（可选）。不传则由安装器从作者官方 Release 下载。
+
+.PARAMETER Uninstall
+    改为执行卸载。
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\install-community-mod.ps1
 #>
 param(
     [string]$GamePath = "",
-    [string]$Version = "v8.0"
+    [string]$Zip = "",
+    [switch]$Uninstall
 )
 
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
-$env:PYTHONIOENCODING = "utf-8"
 
 $Root = Split-Path -Parent $PSScriptRoot
-$WorkDir = Join-Path $Root "work"
-$Upstream = Join-Path $Root "tools\TrRebootModTools"
-$ToolProj = Join-Path $Root "tools\TrTextTool\TrTextTool.csproj"
-$ToolDll = Join-Path $Root "tools\TrTextTool\bin\Release\net8.0\TrTextTool.dll"
+$ToolsDir = Join-Path $Root "tools\TrRebootModTools-1.10"
+$InstallerProj = Join-Path $Root "installer\Tr2013CnInstaller\Tr2013CnInstaller.csproj"
+$InstallerExe = Join-Path $Root "installer\Tr2013CnInstaller\bin\Release\net8.0-windows\TR2013CnInstaller.exe"
 $FixPatch = Join-Path $Root "patches\0001-tr2013-localsbin-pointer-size.patch"
-$ModUrl = "https://github.com/intergra/TR2013-Simplified-Chinese/releases/download/$Version/TR2013-Simplified-Chinese.zip"
-$ModName = "TR2013-Simplified-Chinese"
-$ModDir = Join-Path $WorkDir $ModName
+$PinnedCommit = "5309f18"
 
 function Write-Step([string]$Text) { Write-Host "`n=== $Text ===" -ForegroundColor Cyan }
 function Fail([string]$Text) { Write-Host "错误：$Text" -ForegroundColor Red; exit 1 }
 
 # ---------- 1. 环境 ----------
 Write-Step "检查环境"
-foreach ($cmd in @("dotnet", "git")) {
-    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        Fail "找不到 $cmd，请先安装：dotnet SDK 10 / Git"
-    }
-}
+if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { Fail "找不到 dotnet，请先安装 .NET SDK 10" }
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Fail "找不到 git" }
+
 $sdk = (& dotnet --list-sdks) -join "`n"
 if (-not ($sdk -split "`n" | Where-Object { $_ -match "^10\." })) {
-    Fail ".NET SDK 10 未安装。上游代码使用 C# 14。已安装：`n$sdk"
+    Fail ".NET SDK 10 未安装（1.10.0 源码使用 C# 14）。已安装：`n$sdk"
 }
 Write-Host "dotnet OK"
 
@@ -86,86 +81,58 @@ if (-not $GamePath) {
 }
 if (-not (Test-Path $GamePath)) { Fail "游戏目录不存在：$GamePath" }
 $GamePath = (Resolve-Path $GamePath).Path
-
-# 安装需要约 7 GB 空间：mod 档案 1.8 GB + 扁平化后的 patch2 1.8 GB + 解压后的汉化包 2 GB + 下载的 zip 1.1 GB
-$driveName = (Split-Path -Qualifier $GamePath).TrimEnd(':')
-$freeSpace = (Get-PSDrive -Name $driveName -ErrorAction SilentlyContinue).Free
-if ($freeSpace -and $freeSpace -lt 8GB) {
-    Fail ("磁盘空间不足：{0}: 需要约 8 GB 可用空间，当前只有 {1:N1} GB" -f $driveName, ($freeSpace / 1GB))
-}
-if (-not (Test-Path (Join-Path $GamePath "TombRaider.exe"))) {
-    Fail "$GamePath 下没有 TombRaider.exe"
-}
+if (-not (Test-Path (Join-Path $GamePath "TombRaider.exe"))) { Fail "$GamePath 下没有 TombRaider.exe" }
 Write-Host "游戏目录：$GamePath"
 
-if (Get-Process TombRaider -ErrorAction SilentlyContinue) { Fail "游戏正在运行，请先退出" }
+# ---------- 3. 准备 1.10.0 工具 ----------
+Write-Step "准备 Mod Manager 1.10.0（作者验证版本）"
 
-# ---------- 3. 下载 ----------
-Write-Step "下载汉化包 $Version（约 1.1 GB）"
-New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
-$zipPath = Join-Path $WorkDir "$ModName.zip"
-
-if (-not (Test-Path $zipPath) -or (Get-Item $zipPath).Length -lt 100MB) {
-    Write-Host "从 $ModUrl 下载 ..."
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $wc = New-Object Net.WebClient
-    try {
-        $wc.DownloadFile($ModUrl, $zipPath)
-    } catch {
-        if (Test-Path $zipPath) { Remove-Item $zipPath -Force -ErrorAction SilentlyContinue }
-        Fail "下载失败：$($_.Exception.Message)`n可以手动下载后放到 $zipPath 再重试"
-    }
-}
-Write-Host ("已下载 {0:N1} MB" -f ((Get-Item $zipPath).Length / 1MB))
-
-# ---------- 4. 解压 ----------
-Write-Step "解压"
-if (Test-Path $ModDir) { Remove-Item $ModDir -Recurse -Force }
-New-Item -ItemType Directory -Force -Path $ModDir | Out-Null
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-try {
-    [IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $ModDir)
-}
-catch {
-    Fail "解压失败（文件可能下载不完整）：$($_.Exception.Message)`n请删除 $zipPath 后重试"
-}
-Write-Host "解压到 $ModDir"
-
-# ---------- 5. 构建 ModManager ----------
-Write-Step "准备 Mod Manager"
-if (-not (Test-Path $Upstream)) {
-    git clone --depth 1 https://github.com/arcusmaximus/TrRebootModTools.git $Upstream
+if (-not (Test-Path $ToolsDir)) {
+    git clone https://github.com/arcusmaximus/TrRebootModTools.git $ToolsDir
     if ($LASTEXITCODE -ne 0) { Fail "克隆 TrRebootModTools 失败" }
 }
-$localsBin = Join-Path $Upstream "Shared\Cdc\Tr2013\Tr2013LocalsBin.cs"
+Push-Location $ToolsDir
+$current = (git rev-parse --short HEAD).Trim()
+if (-not $current.StartsWith($PinnedCommit)) {
+    Write-Host "切换到固定提交 $PinnedCommit ..."
+    git fetch --depth 1 origin $PinnedCommit
+    if ($LASTEXITCODE -ne 0) { git fetch origin $PinnedCommit }
+    git checkout -q $PinnedCommit
+    if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "切换提交失败" }
+}
+$localsBin = Join-Path $ToolsDir "Shared\Cdc\Tr2013\Tr2013LocalsBin.cs"
 if (-not (Select-String -Path $localsBin -Pattern "\(int\)stream\.Length" -Quiet)) {
-    Push-Location $Upstream
     git apply $FixPatch
-    Pop-Location
-    Write-Host "已修复上游 locals.bin 写入 bug"
+    if ($LASTEXITCODE -ne 0) { Pop-Location; Fail "应用 locals.bin 写入修复失败" }
+    Write-Host "已应用 locals.bin 写入修复"
+}
+Pop-Location
+Write-Host "工具版本：1.10.0（提交 $PinnedCommit）"
+
+# ---------- 4. 构建安装器 ----------
+Write-Step "构建安装器"
+& dotnet build $InstallerProj -c Release -v quiet --nologo
+if ($LASTEXITCODE -ne 0) { Fail "构建失败" }
+if (-not (Test-Path $InstallerExe)) { Fail "没有找到构建产物 $InstallerExe" }
+
+# ---------- 5. 运行 ----------
+Write-Step $(if ($Uninstall) { "卸载" } else { "安装" })
+# 注意：$InstallerExe 是 GUI 程序，PowerShell 的 & 调用不会等待它结束，
+# 必须用 Start-Process -Wait，否则脚本会在安装还没跑完时就报告成功。
+# 路径可能含空格（"Tomb Raider"），Start-Process 不会自动加引号，必须自己加
+function Quote([string]$v) { '"' + $v + '"' }
+
+if ($Uninstall) {
+    $argList = "--uninstall $(Quote $GamePath)"
+} elseif ($Zip) {
+    $argList = "--install $(Quote $GamePath) --zip $(Quote $Zip)"
+} else {
+    $argList = "--install $(Quote $GamePath)"
 }
 
-& dotnet build $ToolProj -c Release -v quiet --nologo
-if ($LASTEXITCODE -ne 0) { Fail "构建失败" }
-Copy-Item (Join-Path $Upstream "Extractor\TR2013_PC_Release.list") `
-          (Join-Path (Split-Path $ToolDll) "TR2013_PC_Release.list") -Force
-Write-Host "构建完成"
-
-# ---------- 6. 安装 ----------
-Write-Step "安装到游戏"
-& dotnet $ToolDll install $GamePath $ModDir
-if ($LASTEXITCODE -ne 0) { Fail "安装失败" }
+$proc = Start-Process -FilePath $InstallerExe -ArgumentList $argList -NoNewWindow -Wait -PassThru
+if ($proc.ExitCode -ne 0) { Fail "操作失败（退出码 $($proc.ExitCode)）" }
 
 Write-Step "完成"
-Write-Host "安装成功。启动游戏，界面与字幕即为简体中文。" -ForegroundColor Green
-
-# 解压出来的目录约 2 GB，装完就没用了；zip 保留以便下次复用
-Remove-Item $ModDir -Recurse -Force -ErrorAction SilentlyContinue
-
-Write-Host ""
-Write-Host "注意："
-Write-Host "  · 游戏语言请设为 Chinese / 中文（游戏内 语言设置，或 Steam 属性 -> 语言）"
-Write-Host "  · 语音仍是英文，官方无中文配音"
-Write-Host "  · 卸载：dotnet `"$ToolDll`" uninstall `"$GamePath`"" -ForegroundColor DarkGray
-Write-Host "  · Steam 验证文件完整性或重装游戏后，补丁会失效，重新运行本脚本即可" -ForegroundColor DarkGray
-Write-Host "  · 已删除解压目录以省空间；下载的 zip 保留在 $zipPath" -ForegroundColor DarkGray
+Write-Host "启动游戏，在「语言」设置里选 Chinese / 中文。" -ForegroundColor Green
+Write-Host "语音仍是英文，官方无中文配音。" -ForegroundColor DarkGray

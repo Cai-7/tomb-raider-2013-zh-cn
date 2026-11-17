@@ -269,7 +269,7 @@ public sealed class InstallerCore
 
         foreach (Archive archive in archives.Archives)
         {
-            foreach (ArchiveFileDescriptor file in archive.Files)
+            foreach (var file in archive.Files)
             {
                 string? path = CdcHash.Lookup(file.NameHash, CdcGame.Tr2013, true);
                 if (path == null)
@@ -280,7 +280,7 @@ public sealed class InstallerCore
                     ResourceCollection? coll = archives.GetResourceCollection(file);
                     if (coll == null)
                         continue;
-                    foreach (ResourceDescriptor r in coll.Resources.Where(r => r.Id == 0x60F8))
+                    foreach (var r in coll.ResourceReferences.Where(x => x.Id == 0x60F8))
                     {
                         using Stream? s = archives.TryOpenResource(r);
                         if (s != null && s.Length == ExpectedFontResourceLength)
@@ -315,11 +315,16 @@ public sealed class InstallerCore
 
     // ---------------------------------------------------------------- 卸载
 
-    /// <summary>卸载全部已安装 mod，并把 patch2 还原成官方原件。</summary>
+    /// <summary>
+    /// 只卸载本汉化 mod；如果用户还装了别的 mod，会重新打包把它们保留下来，
+    /// 否则用官方原件还原 patch2。
+    /// </summary>
     public Task UninstallAsync(string gamePath, CancellationToken ct)
     {
         if (IsGameRunning())
             throw new InvalidOperationException("游戏正在运行，请先完全退出再卸载。");
+
+        bool hasOtherMods = false;
 
         // TR2013 的 mod 全部扁平化进 patch2.000.tiger，一个 mod 可能有多个档案（不同 subId）
         // 但共用同一个 archive id，必须按去重后的 id 一次性删除。
@@ -328,27 +333,47 @@ public sealed class InstallerCore
             var cache = new ResourceUsageCache();
             cache.AddArchiveSet(archives, null, CancellationToken.None);
 
-            List<int> modIds = archives.Archives
-                                       .Where(a => a.ModName != null)
+            List<int> ourIds = archives.Archives
+                                       .Where(a => a.ModName != null &&
+                                                   a.ModName.StartsWith(ModName, StringComparison.OrdinalIgnoreCase))
                                        .Select(a => a.Id)
                                        .Distinct()
                                        .ToList();
 
-            if (modIds.Count == 0)
-                _log("没有检测到已安装的 mod。");
+            hasOtherMods = archives.Archives.Any(a => a.ModName != null &&
+                                                      !a.ModName.StartsWith(ModName, StringComparison.OrdinalIgnoreCase));
+
+            if (ourIds.Count == 0)
+                _log("没有检测到本汉化 mod。");
             else
             {
-                foreach (int id in modIds)
+                foreach (int id in ourIds)
                     _log($"移除 mod 档案 id={id} ...");
-                archives.Delete(modIds, cache, new ProgressAdapter(_log), ct);
+                archives.Delete(ourIds, cache, new ProgressAdapter(_log), ct);
+            }
+
+            if (hasOtherMods)
+            {
+                // 还有其它 mod：以官方原件为底稿，把剩下的 mod 重新扁平化进 patch2
+                _log("检测到其它 mod，正在重新打包以保留它们 ...");
+                var installer = new ModInstaller(archives, cache);
+                installer.UpdateFlatModArchive(new ProgressAdapter(_log), ct);
             }
         }
         // 退出 using 释放所有档案句柄后再动 patch2 文件
 
-        foreach (string file in Directory.EnumerateFiles(gamePath, "bigfile._mod.*"))
+        // 只删本 mod 的档案文件，不动别人的
+        string pattern = $"bigfile._mod.{ModName.ToLowerInvariant()}*";
+        foreach (string file in Directory.EnumerateFiles(gamePath, pattern))
         {
             try { File.Delete(file); }
             catch (IOException ex) { _log($"警告：无法删除 {Path.GetFileName(file)}：{ex.Message}"); }
+        }
+
+        if (hasOtherMods)
+        {
+            _log("已卸载汉化，其它 mod 已保留 ✓");
+            return Task.CompletedTask;
         }
 
         if (RestoreOfficialPatch2(gamePath))
